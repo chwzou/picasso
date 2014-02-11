@@ -294,8 +294,13 @@ public class Picasso {
   }
 
   void complete(BitmapHunter hunter) {
+    Action single = hunter.getAction();
     List<Action> joined = hunter.getActions();
-    if (joined.isEmpty()) {
+
+    boolean hasMultiple = joined != null && !joined.isEmpty();
+    boolean shouldDeliver = single != null || hasMultiple;
+
+    if (!shouldDeliver) {
       return;
     }
 
@@ -304,25 +309,36 @@ public class Picasso {
     Bitmap result = hunter.getResult();
     LoadedFrom from = hunter.getLoadedFrom();
 
+    if (single != null) {
+      deliverAction(result, from, single);
+      if (!hasMultiple) {
+        return;
+      }
+    }
+
     //noinspection ForLoopReplaceableByForEach
     for (int i = 0, n = joined.size(); i < n; i++) {
       Action join = joined.get(i);
-      if (join.isCancelled()) {
-        continue;
-      }
-      targetToAction.remove(join.getTarget());
-      if (result != null) {
-        if (from == null) {
-          throw new AssertionError("LoadedFrom cannot be null.");
-        }
-        join.complete(result, from);
-      } else {
-        join.error();
-      }
+      deliverAction(result, from, join);
     }
 
     if (listener != null && exception != null) {
       listener.onImageLoadFailed(this, uri, exception);
+    }
+  }
+
+  private void deliverAction(Bitmap result, LoadedFrom from, Action action) {
+    if (action.isCancelled()) {
+      return;
+    }
+    targetToAction.remove(action.getTarget());
+    if (result != null) {
+      if (from == null) {
+        throw new AssertionError("LoadedFrom cannot be null.");
+      }
+      action.complete(result, from);
+    } else {
+      action.error();
     }
   }
 
